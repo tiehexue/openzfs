@@ -222,8 +222,8 @@ static uint64_t dbuf_cache_max_bytes = UINT64_MAX;
 static uint64_t dbuf_metadata_cache_max_bytes = UINT64_MAX;
 
 /* Set the default sizes of the caches to log2 fraction of arc size */
-static uint_t dbuf_cache_shift = 5;
-static uint_t dbuf_metadata_cache_shift = 6;
+static uint_t dbuf_cache_shift = 0;
+static uint_t dbuf_metadata_cache_shift = 0;
 
 /* Set the dbuf hash mutex count as log2 shift (dynamic by default) */
 static uint_t dbuf_mutex_cache_shift = 0;
