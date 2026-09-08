@@ -41,7 +41,8 @@ tests = ['alloc_class_003_pos', 'alloc_class_004_pos', 'alloc_class_005_pos',
 tags = ['functional', 'alloc_class']
 
 [tests/functional/arc]
-tests = ['dbufstats_001_pos', 'dbufstats_002_pos', 'arcstats_runtime_tuning']
+tests = ['dbufstats_001_pos', 'dbufstats_002_pos', 'arcstats_runtime_tuning',
+    'arc_bypass_demand_001_pos']
 tags = ['functional', 'arc']
 
 [tests/functional/bootfs]

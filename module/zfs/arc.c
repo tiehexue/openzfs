@@ -512,6 +512,7 @@ arc_stats_t arc_stats = {
 	{ "mfu_ghost_hits",		KSTAT_DATA_UINT64 },
 	{ "uncached_hits",		KSTAT_DATA_UINT64 },
 	{ "deleted",			KSTAT_DATA_UINT64 },
+	{ "bypass_demand",		KSTAT_DATA_UINT64 },
 	{ "mutex_miss",			KSTAT_DATA_UINT64 },
 	{ "access_skip",		KSTAT_DATA_UINT64 },
 	{ "evict_skip",			KSTAT_DATA_UINT64 },
@@ -5115,6 +5116,45 @@ arc_adapt(uint64_t bytes)
 }
 
 /*
+ * Adapt the target cache size for I/O that bypasses the ARC.
+ *
+ * Normal cached I/O grows the target cache size (arc_c) through arc_adapt(),
+ * which only fires once the current cache size is within (2 * maxblocksize) of
+ * the target.  Reads that deliberately bypass the ARC -- Direct I/O reads and
+ * reads from datasets with caching disabled (primarycache=none|metadata) --
+ * never allocate the buffers they touch, so they can never trigger that path.
+ * Nevertheless, the metadata and dbuf working set that serves them is still
+ * sized from budgets derived from arc_c (e.g. the dbuf cache target is
+ * arc_c >> dbuf_cache_shift), which is then left chronically undersized.
+ *
+ * Feeding the bypassed bytes back into the growth logic lets arc_c -- and the
+ * budgets that follow it -- reflect the read I/O actually being served.  Only
+ * reads are reported: write data becomes resident on disk, and the cache it
+ * implies is accounted for when that data is read back, so counting writes
+ * would double-count the same bytes and inflate the budgets needlessly.
+ * Growth is still bounded by arc_c_max and gated on not being under memory
+ * pressure, exactly like arc_adapt().  arc_c is only a target: growing it
+ * consumes no memory by itself, and arc_reduce_target_size() continues to
+ * shrink it when the OS asks for memory back.
+ */
+void
+arc_bypass_adapt(uint64_t bytes)
+{
+	if (bytes == 0)
+		return;
+
+	ARCSTAT_INCR(arcstat_bypass_demand, bytes);
+
+	/* Same growth gates as arc_adapt(). */
+	if (arc_no_grow || arc_c >= arc_c_max || arc_reclaim_needed())
+		return;
+
+	uint64_t dc = MAX(bytes, SPA_OLD_MAXBLOCKSIZE);
+	if (atomic_add_64_nv(&arc_c, dc) > arc_c_max)
+		arc_c = arc_c_max;
+}
+
+/*
  * Check if ARC current size has grown past our upper thresholds.
  */
 static arc_ovf_level_t
@@ -7350,6 +7390,8 @@ arc_kstat_update(kstat_t *ksp, int rw)
 	    wmsum_value(&arc_sums.arcstat_uncached_hits);
 	as->arcstat_deleted.value.ui64 =
 	    wmsum_value(&arc_sums.arcstat_deleted);
+	as->arcstat_bypass_demand.value.ui64 =
+	    wmsum_value(&arc_sums.arcstat_bypass_demand);
 	as->arcstat_mutex_miss.value.ui64 =
 	    wmsum_value(&arc_sums.arcstat_mutex_miss);
 	as->arcstat_access_skip.value.ui64 =
@@ -7792,6 +7834,7 @@ arc_state_init(void)
 	wmsum_init(&arc_sums.arcstat_mfu_ghost_hits, 0);
 	wmsum_init(&arc_sums.arcstat_uncached_hits, 0);
 	wmsum_init(&arc_sums.arcstat_deleted, 0);
+	wmsum_init(&arc_sums.arcstat_bypass_demand, 0);
 	wmsum_init(&arc_sums.arcstat_mutex_miss, 0);
 	wmsum_init(&arc_sums.arcstat_access_skip, 0);
 	wmsum_init(&arc_sums.arcstat_evict_skip, 0);
@@ -7951,6 +7994,7 @@ arc_state_fini(void)
 	wmsum_fini(&arc_sums.arcstat_mfu_ghost_hits);
 	wmsum_fini(&arc_sums.arcstat_uncached_hits);
 	wmsum_fini(&arc_sums.arcstat_deleted);
+	wmsum_fini(&arc_sums.arcstat_bypass_demand);
 	wmsum_fini(&arc_sums.arcstat_mutex_miss);
 	wmsum_fini(&arc_sums.arcstat_access_skip);
 	wmsum_fini(&arc_sums.arcstat_evict_skip);

@@ -593,6 +593,12 @@ typedef struct arc_stats {
 	kstat_named_t arcstat_uncached_hits;
 	kstat_named_t arcstat_deleted;
 	/*
+	 * Bytes of read I/O that bypassed the ARC (Direct I/O reads,
+	 * cache-disabled datasets) and were reported via arc_bypass_adapt().
+	 * Cumulative, informational counter.
+	 */
+	kstat_named_t arcstat_bypass_demand;
+	/*
 	 * Number of buffers that could not be evicted because the hash lock
 	 * was held by another thread.  The lock may not necessarily be held
 	 * by something using the same buffer, since hash locks are shared
@@ -979,6 +985,7 @@ typedef struct arc_sums {
 	wmsum_t arcstat_mfu_ghost_hits;
 	wmsum_t arcstat_uncached_hits;
 	wmsum_t arcstat_deleted;
+	wmsum_t arcstat_bypass_demand;
 	wmsum_t arcstat_mutex_miss;
 	wmsum_t arcstat_access_skip;
 	wmsum_t arcstat_evict_skip;

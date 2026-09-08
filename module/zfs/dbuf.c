@@ -1635,9 +1635,17 @@ dbuf_read_impl(dmu_buf_impl_t *db, dnode_t *dn, zio_t *zio, dmu_flags_t flags,
 	DTRACE_SET_STATE(db, "read issued");
 	mutex_exit(&db->db_mtx);
 
-	if (!DBUF_IS_CACHEABLE(db))
+	if (!DBUF_IS_CACHEABLE(db)) {
 		aflags |= ARC_FLAG_UNCACHED;
-	else if (dbuf_is_l2cacheable(db, bp))
+		/*
+		 * This buffer will not be retained by the ARC, so it can
+		 * never trigger the normal arc_adapt() growth path.  Report
+		 * the size so that budgets derived from the target cache
+		 * size (e.g. the dbuf cache) still scale with the I/O being
+		 * served.  See arc_bypass_adapt().
+		 */
+		arc_bypass_adapt(db->db.db_size);
+	} else if (dbuf_is_l2cacheable(db, bp))
 		aflags |= ARC_FLAG_L2CACHE;
 	if (flags & DMU_IS_PREFETCH)
 		aflags |= ARC_FLAG_PREFETCH | ARC_FLAG_PRESCIENT_PREFETCH;

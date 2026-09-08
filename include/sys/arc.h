@@ -328,6 +328,12 @@ uint64_t arc_all_memory(void);
 uint64_t arc_default_max(uint64_t min, uint64_t allmem);
 uint64_t arc_target_bytes(void);
 uint64_t arc_boot_target_bytes(void);
+/*
+ * Report reads that bypassed the ARC (e.g. Direct I/O, cache-disabled
+ * datasets) so the target cache size and its derived budgets (such as
+ * the dbuf cache) can reflect the read I/O actually being served.
+ */
+void arc_bypass_adapt(uint64_t bytes);
 void arc_set_limits(uint64_t);
 void arc_init(void);
 void arc_fini(void);

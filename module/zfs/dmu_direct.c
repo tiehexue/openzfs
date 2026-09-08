@@ -11,6 +11,7 @@
  */
 
 
+#include <sys/arc.h>
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
 #include <sys/dbuf.h>
@@ -339,6 +340,8 @@ dmu_read_abd(dnode_t *dn, uint64_t offset, uint64_t size,
 #else
 		zio_priority_t prio = ZIO_PRIORITY_SYNC_READ;
 #endif
+		/* This Direct I/O read bypasses the ARC entirely. */
+		arc_bypass_adapt(db->db.db_size);
 		zio_t *cio = zio_read(rio, spa, bp, mbuf, db->db.db_size,
 		    dmu_read_abd_done, NULL, prio,
 		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DIO_READ, &zb);
